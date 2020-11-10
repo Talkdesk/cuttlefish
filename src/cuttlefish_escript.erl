@@ -27,7 +27,6 @@
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
 -endif.
 
 cli_options() ->
@@ -38,9 +37,12 @@ cli_options() ->
  {dest_dir,     $d, "dest_dir",    string,             "specifies the directory to write the config file to"},
  {dest_file,    $f, "dest_file",   {string, "app"},    "the file name to write"},
  {schema_dir,   $s, "schema_dir",  string,             "a directory containing .schema files"},
+ %%  one or more schema file paths
  {schema_file,  $i, "schema_file", string,             "individual schema file, will be processed in command line order, after -s"},
- {conf_file,    $c, "conf_file",   string,             "a cuttlefish conf file, multiple files allowed"},
- {app_config,   $a, "app_config",  string,             "the advanced erlangy app.config"},
+ %% one or more sysctl-style configuration file paths
+ {conf_file,    $c, "conf_file",   string,             "a cuttlefish conf file path, multiple files allowed"},
+ %% overrides advanced.config file path
+ {advanced_conf_file, $a, "advanced_conf_file", string, "the advanced config file path"},
  {log_level,    $l, "log_level",   {string, "notice"}, "log level for cuttlefish output"},
  {print_schema, $p, "print",       undefined,          "prints schema mappings on stderr"},
  {max_history,  $m, "max_history", {integer, 3},       "the maximum number of generated config files to keep"}
@@ -83,6 +85,8 @@ main(Args) ->
     lager:start(),
     lager:debug("Cuttlefish set to debug level logging"),
 
+    lager:debug("Parsed arguments: ~p", [ParsedArgs]),
+
     case Command of
         help ->
             print_help();
@@ -107,10 +111,11 @@ effective(ParsedArgs) ->
 
     case {AppConfigExists, VMArgsExists} of
         {false, false} ->
-            AdvancedConfigFile = filename:join(EtcDir, "advanced.config"),
+            AdvancedConfigFile = proplists:get_value(advanced_conf_file, ParsedArgs, filename:join(EtcDir, "advanced.config")),
+            lager:debug("Will look for advanced.config at '~s'", [AdvancedConfigFile]),
             AdvConfig = case filelib:is_file(AdvancedConfigFile) of
                 true ->
-                    lager:debug("~s/advanced.config detected, overlaying proplists", [EtcDir]),
+                    lager:debug("~s detected, overlaying proplists", [AdvancedConfigFile]),
                     case file:consult(AdvancedConfigFile) of
                         {ok, [AdvancedConfig]} ->
                             AdvancedConfig;
@@ -244,7 +249,7 @@ generate(ParsedArgs) ->
         {true, true} ->
             lager:info("~s and ~s exists, disabling cuttlefish.", [ExistingAppConfigName, ExistingVMArgsName]),
             lager:info("If you'd like to know more about cuttlefish, check your local library!", []),
-            lager:info(" or see http://github.com/basho/cuttlefish", []),
+            lager:info(" or see http://github.com/Kyorai/cuttlefish", []),
             {ExistingAppConfigName, ExistingVMArgsName};
         {true, false} ->
             lager:info("~s exists, generating vm.args", [ExistingAppConfigName]),
@@ -357,7 +362,6 @@ engage_cuttlefish(ParsedArgs) ->
     lager:debug("Generating config in: ~p", [Destination]),
 
     Schema = load_schema(ParsedArgs),
-
     Conf = load_conf(ParsedArgs),
     NewConfig = case cuttlefish_generator:map(Schema, Conf) of
         {error, Phase, {errorlist, Errors}} ->
@@ -367,10 +371,11 @@ engage_cuttlefish(ParsedArgs) ->
         ValidConfig -> ValidConfig
     end,
 
-    AdvancedConfigFile = filename:join(EtcDir, "advanced.config"),
+    AdvancedConfigFile = proplists:get_value(advanced_conf_file, ParsedArgs, filename:join(EtcDir, "advanced.config")),
+    lager:debug("AdvancedConfigFile: ~p", [AdvancedConfigFile]),
     FinalConfig = case filelib:is_file(AdvancedConfigFile) of
         true ->
-            lager:info("~s/advanced.config detected, overlaying proplists", [EtcDir]),
+            lager:info("advanced config file is detected at ~s, overlaying proplists", [AdvancedConfigFile]),
             case file:consult(AdvancedConfigFile) of
                 {ok, [AdvancedConfig]} ->
                     cuttlefish_advanced:overlay(NewConfig, AdvancedConfig);

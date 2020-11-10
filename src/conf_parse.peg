@@ -3,6 +3,7 @@
 %% conf_parse: for all your .conf parsing needs.
 %%
 %% Copyright (c) 2013 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2019 Pivotal Software, Inc.  All rights reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -19,6 +20,24 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
+% -------------------------------------------------------------------
+% NOTE: IMPORTANT
+%
+% After using neotoma to re-generate conf_parse.erl, you MUST
+% edit that file to change the exported file/1 function to this code:
+%
+% -spec file(file:name()) -> any().
+% file(Filename) ->
+%     AbsFilename = filename:absname(Filename),
+%     case erl_prim_loader:get_file(AbsFilename) of
+%         {ok, Bin, _} -> parse(Bin);
+%         error -> {error, undefined}
+%     end.
+%
+% The reason is that the above code allows for reading cuttlefish
+% schemas from .ez archives
+% -------------------------------------------------------------------
 
 %% A configuration file may have zero-or-more lines.
 config <- line* %{
@@ -75,16 +94,14 @@ crlf <- "\r"? "\n" `ws`;
 eof <- !. `ws`;
 
 %% Whitespace is either spaces or tabs.
-ws <- [ \t] `ws`;
+ws <- [ \t]+ `ws`;
 
 % Erlang code
 %{
 
 %% -------------------------------------------------------------------
 %%
-%% conf_parse: for all your .conf parsing needs.
-%%
-%% Copyright (c) 2013 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2013-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -101,10 +118,13 @@ ws <- [ \t] `ws`;
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
-%% This module implements the parser for a sysctl-style
-%% configuration format. Example:
 %%
+%% This is a generated file, changes should be made to conf_parse.peg.
+%%
+
+%% This module implements the parser for a sysctl-style configuration format.
+%%
+%% Example:
 %% ```
 %% riak.local.node = riak@127.0.0.1
 %% riak.local.http = 127.0.0.1:8098
@@ -121,17 +141,18 @@ ws <- [ \t] `ws`;
 %%
 %% Other modules in this application interpret and validate the
 %% result of a successful parse.
-%% @end
+%%
+
 -define(line, true).
 -define(FMT(F,A), lists:flatten(io_lib:format(F,A))).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
 -endif.
 
 %% @doc Only let through lines that are not comments or whitespace.
 is_setting(ws) -> false;
+is_setting([ws]) -> false;
 is_setting(comment) -> false;
 is_setting(_) -> true.
 
@@ -144,7 +165,7 @@ unescape_dots([C|Rest]) ->
 
 -ifdef(TEST).
 file_test() ->
-    Conf = conf_parse:file("../test/riak.conf"),
+    Conf = conf_parse:file(cuttlefish_test_util:test_file("riak.conf")),
     ?assertEqual([
             {["ring_size"],"32"},
             {["anti_entropy"],"debug"},
@@ -162,5 +183,22 @@ utf8_test() ->
             {error, {conf_to_latin1, 1}}
         }], Conf),
     ok.
+
+gh_1_two_tab_test() ->
+    Conf = conf_parse:parse("setting0 = thing0\n\t\t\nsetting1 = thing1\n"),
+    ?assertEqual([
+            {["setting0"],"thing0"},
+            {["setting1"],"thing1"}
+        ], Conf),
+    ok.
+
+gh_1_three_tab_test() ->
+    Conf = conf_parse:parse("setting0 = thing0\n\t\t\t\nsetting1 = thing1\n"),
+    ?assertEqual([
+            {["setting0"],"thing0"},
+            {["setting1"],"thing1"}
+        ], Conf),
+    ok.
+
 -endif.
 %}

@@ -17,9 +17,7 @@
 
 %% -------------------------------------------------------------------
 %%
-%% conf_parse: for all your .conf parsing needs.
-%%
-%% Copyright (c) 2013 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2013-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -36,10 +34,13 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
-%% This module implements the parser for a sysctl-style
-%% configuration format. Example:
 %%
+%% This is a generated file, changes should be made to conf_parse.peg.
+%%
+
+%% This module implements the parser for a sysctl-style configuration format.
+%%
+%% Example:
 %% ```
 %% riak.local.node = riak@127.0.0.1
 %% riak.local.http = 127.0.0.1:8098
@@ -56,17 +57,18 @@
 %%
 %% Other modules in this application interpret and validate the
 %% result of a successful parse.
-%% @end
+%%
+
 -define(line, true).
 -define(FMT(F,A), lists:flatten(io_lib:format(F,A))).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
 -endif.
 
 %% @doc Only let through lines that are not comments or whitespace.
 is_setting(ws) -> false;
+is_setting([ws]) -> false;
 is_setting(comment) -> false;
 is_setting(_) -> true.
 
@@ -79,7 +81,7 @@ unescape_dots([C|Rest]) ->
 
 -ifdef(TEST).
 file_test() ->
-    Conf = conf_parse:file("../test/riak.conf"),
+    Conf = conf_parse:file(cuttlefish_test_util:test_file("riak.conf")),
     ?assertEqual([
             {["ring_size"],"32"},
             {["anti_entropy"],"debug"},
@@ -92,18 +94,35 @@ file_test() ->
     ok.
 
 utf8_test() ->
-    Conf = conf_parse:parse("setting = thingŒ\n"),
+    Conf = conf_parse:parse("setting = thing" ++ [338] ++ "\n"),
     ?assertEqual([{["setting"],
             {error, {conf_to_latin1, 1}}
         }], Conf),
     ok.
+
+gh_1_two_tab_test() ->
+    Conf = conf_parse:parse("setting0 = thing0\n\t\t\nsetting1 = thing1\n"),
+    ?assertEqual([
+            {["setting0"],"thing0"},
+            {["setting1"],"thing1"}
+        ], Conf),
+    ok.
+
+gh_1_three_tab_test() ->
+    Conf = conf_parse:parse("setting0 = thing0\n\t\t\t\nsetting1 = thing1\n"),
+    ?assertEqual([
+            {["setting0"],"thing0"},
+            {["setting1"],"thing1"}
+        ], Conf),
+    ok.
+
 -endif.
 
 -spec file(file:name()) -> any().
 file(Filename) -> case file:read_file(Filename) of {ok,Bin} -> parse(Bin); Err -> Err end.
 
 -spec parse(binary() | list()) -> any().
-parse(List) when is_list(List) -> parse(list_to_binary(List));
+parse(List) when is_list(List) -> parse(unicode:characters_to_binary(List));
 parse(Input) when is_binary(Input) ->
   _ = setup_memo(),
   Result = case 'config'(Input,{{line,1},{column,1}}) of
@@ -172,7 +191,7 @@ parse(Input) when is_binary(Input) ->
 
 -spec 'ws'(input(), index()) -> parse_result().
 'ws'(Input, Index) ->
-  p(Input, Index, 'ws', fun(I,D) -> (p_charclass(<<"[\s\t]">>))(I,D) end, fun(_Node, _Idx) ->ws end).
+  p(Input, Index, 'ws', fun(I,D) -> (p_one_or_more(p_charclass(<<"[\s\t]">>)))(I,D) end, fun(_Node, _Idx) ->ws end).
 
 
 

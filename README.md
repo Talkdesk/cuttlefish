@@ -1,9 +1,20 @@
 # Cuttlefish
 
+[![Build Status](https://travis-ci.org/Kyorai/cuttlefish.svg?branch=develop)](https://travis-ci.org/Kyorai/cuttlefish)
+[![Build status (windows)](https://ci.appveyor.com/api/projects/status/lo8ssrixiqmufc3j?svg=true)](https://ci.appveyor.com/project/Licenser/cuttlefish)
+[![Coverage Status](https://coveralls.io/repos/github/Kyorai/cuttlefish/badge.svg?branch=master)](https://coveralls.io/github/Kyorai/cuttlefish)
+[![Hex version](https://img.shields.io/hexpm/v/cuttlefish.svg "Hex version")](https://hex.pm/packages/cuttlefish)
+
 Cuttlefish is a library for Erlang applications that wish to walk the
 fine line between Erlang `app.config`s and a sysctl-like syntax.
 The name is a pun on the pronunciation of 'sysctl' and jokes are
 better explained.
+
+This repository retains full history of the original repository, [basho/cuttlefish/](https://github.com/basho/cuttlefish/),
+but intentionally cut ties with that repo to avoid confusion as to
+where is the most up-to-date, maintained version is.
+
+This is the repository used to produce [Hex.pm releases](https://hex.pm/packages/cuttlefish) of the project.
 
 ## Riak Disclaimer
 
@@ -88,7 +99,14 @@ https://github.com/basho/cuttlefish/wiki/Cuttlefish-for-Application-Users
 * [node_package](https://github.com/basho/cuttlefish/wiki/Cuttlefish-for-node_package-users)
 * [non node_package](https://github.com/basho/cuttlefish/wiki/Cuttlefish-for-non-node_package-users)
 
-
 ## Current Status
 
 Cuttlefish is ready for production deployments.
+
+## Re-generating parser
+
+```
+rebar3 as dev neotoma
+```
+
+Please see the *NOTE* in `src/conf_parse.peg` as well.
